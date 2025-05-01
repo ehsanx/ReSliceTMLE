@@ -1,2 +1,3 @@
 # ReSliceTMLE
-ReSliceTMLE: Repeated Sample Splitting and Cross-Fitting for Stable and Accurate Targeted Maximum Likelihood Estimation (TMLE)
+
+ReSliceTMLE implements robust TMLE variants using repeated cross-validation and sample splitting to improve variance estimation and coverage accuracy in high-dimensional causal inference.
