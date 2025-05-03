@@ -8,12 +8,15 @@ Imports:
     dplyr,
     tidyr,
     purrr,
-    tmle,
-    SuperLearner,
     stats,
     utils,
     rlang,
-    magrittr
+    magrittr,
+    stringr,
+    readr, 
+    lubridate,
+    forcats,
+    tibble
 Suggests:
     testthat (>= 3.0.0),
     knitr,
@@ -21,7 +24,12 @@ Suggests:
     ggplot2,
     mice
 Depends: 
-    R (>= 2.10)
+    R (>= 2.10),
+    tmle,
+    SuperLearner,
+    glmnet,
+    gam,
+    nnls
 RoxygenNote: 7.3.2
 Config/testthat/edition: 3
 VignetteBuilder: knitr

@@ -1,3 +1,10 @@
+#' @importFrom dplyr bind_rows %>% as_tibble mutate group_by summarize
+#' @importFrom tidyr nest unnest
+#' @importFrom purrr map
+#' @importFrom utils write.csv
+#' @importFrom stats setNames
+NULL
+
 #' Run TMLE Analysis on a Single Dataset or Multiple Simulations
 #'
 #' This function provides a unified interface for applying any TMLE variant
@@ -58,7 +65,7 @@ run_tmle_analysis <- function(
   # Match arguments
   tmle_variant <- match.arg(tmle_variant)
   parallel_strategy <- match.arg(parallel_strategy)
-
+  
   # Set up default SuperLearner libraries if not provided
   if (is.null(Q.SL.library)) {
     Q.SL.library <- create_sl_library()
@@ -66,7 +73,7 @@ run_tmle_analysis <- function(
   if (is.null(g.SL.library)) {
     g.SL.library <- create_sl_library()
   }
-
+  
   # Process true_value
   true_values_list <- NULL
   if (!is.null(true_value)) {
@@ -80,31 +87,31 @@ run_tmle_analysis <- function(
       warning("Invalid true_value format. Expected either a single ATE value or a vector of 3 values (r1, r0, rd).")
     }
   }
-
+  
   # Determine if we're dealing with simulation data
   is_simulation <- !is.null(sim_id_col) && sim_id_col %in% names(data)
-
+  
   # Initialize results containers
   raw_final_results <- NULL
   raw_intermediate_results <- NULL
-
+  
   # Handle simulation data
   if (is_simulation) {
     # Split data by simulation ID
     split_data_list <- split_simulation_data(data, sim_id_col)
     sim_ids <- as.numeric(gsub("sim_", "", names(split_data_list)))
-
+    
     # Process each simulation dataset
     sim_results_list <- list()
-
+    
     message(paste("Processing", length(split_data_list), "simulation datasets..."))
-
+    
     for (i in seq_along(split_data_list)) {
       sim_id <- sim_ids[i]
       sim_data <- split_data_list[[i]]
-
+      
       message(paste("Processing simulation ID:", sim_id, "(", i, "of", length(split_data_list), ")"))
-
+      
       # Run TMLE on this simulation dataset
       result <- run_single_tmle_analysis(
         data = sim_data,
@@ -121,22 +128,22 @@ run_tmle_analysis <- function(
         binary_outcome = binary_outcome,
         ...
       )
-
+      
       # Add simulation ID to results
       if (!is.null(result$raw_final)) {
         result$raw_final$sim_id <- sim_id
       }
-
+      
       if (!is.null(result$raw_intermediate)) {
         result$raw_intermediate$sim_id <- sim_id
       }
-
+      
       sim_results_list[[i]] <- result
     }
-
+    
     # Combine results from all simulations
     raw_final_results <- dplyr::bind_rows(lapply(sim_results_list, function(x) x$raw_final))
-
+    
     # Only combine intermediate results if they exist
     has_intermediate <- any(sapply(sim_results_list, function(x) !is.null(x$raw_intermediate)))
     if (has_intermediate) {
@@ -144,21 +151,21 @@ run_tmle_analysis <- function(
         lapply(sim_results_list, function(x) x$raw_intermediate)
       )
     }
-
+    
     # If we have true values, calculate coverage
     if (!is.null(true_values_list)) {
       coverage_results <- combine_simulation_results(
         lapply(sim_results_list, function(x) x$raw_final),
         true_values = true_values_list
       )
-
+      
       # Add coverage to results
       combined_summary <- coverage_results$summary
     } else {
       # Just combine results without coverage
       combined_summary <- NULL
     }
-
+    
   } else {
     # Single dataset analysis
     result <- run_single_tmle_analysis(
@@ -176,12 +183,12 @@ run_tmle_analysis <- function(
       binary_outcome = binary_outcome,
       ...
     )
-
+    
     raw_final_results <- result$raw_final
     raw_intermediate_results <- result$raw_intermediate
     combined_summary <- NULL
   }
-
+  
   # Create formatted/interpreted results from raw_final_results
   if (!is.null(raw_final_results)) {
     # Calculate confidence intervals and format results
@@ -189,37 +196,37 @@ run_tmle_analysis <- function(
   } else {
     interpreted_results <- NULL
   }
-
+  
   # Save results if requested
   if (save_results) {
     # Create results directory if it doesn't exist
     if (!dir.exists(results_dir)) {
       dir.create(results_dir, recursive = TRUE)
     }
-
+    
     timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
-
+    
     # Save raw final results
     if (!is.null(raw_final_results)) {
       raw_final_file <- file.path(results_dir, paste0("tmle_raw_final_", timestamp, ".csv"))
       utils::write.csv(raw_final_results, raw_final_file, row.names = FALSE)
       message(paste("Raw final results saved to:", raw_final_file))
     }
-
+    
     # Save raw intermediate results if they exist
     if (!is.null(raw_intermediate_results)) {
       raw_intermediate_file <- file.path(results_dir, paste0("tmle_raw_intermediate_", timestamp, ".csv"))
       utils::write.csv(raw_intermediate_results, raw_intermediate_file, row.names = FALSE)
       message(paste("Raw intermediate results saved to:", raw_intermediate_file))
     }
-
+    
     # Save interpreted results
     if (!is.null(interpreted_results)) {
       interpreted_file <- file.path(results_dir, paste0("tmle_interpreted_", timestamp, ".csv"))
       utils::write.csv(interpreted_results, interpreted_file, row.names = FALSE)
       message(paste("Interpreted results saved to:", interpreted_file))
     }
-
+    
     # Save combined summary if it exists
     if (!is.null(combined_summary)) {
       summary_file <- file.path(results_dir, paste0("tmle_summary_", timestamp, ".csv"))
@@ -227,7 +234,7 @@ run_tmle_analysis <- function(
       message(paste("Summary results saved to:", summary_file))
     }
   }
-
+  
   # Return all results
   return(list(
     raw_final = raw_final_results,
@@ -280,15 +287,15 @@ run_single_tmle_analysis <- function(
     binary_outcome = binary_outcome,
     missing_handling = missing_handling
   )
-
+  
   Y <- prepared_data$Y
   A <- prepared_data$A
   W <- prepared_data$W
-
+  
   # Initialize results
   raw_final <- NULL
   raw_intermediate <- NULL
-
+  
   # Run the appropriate TMLE variant
   if (tmle_variant == "vanilla") {
     result <- vanilla_tmle(
@@ -300,7 +307,7 @@ run_single_tmle_analysis <- function(
       family = family,
       ...
     )
-
+    
     if (!is.null(result)) {
       raw_final <- result$results
       raw_final$method <- "vanilla"
@@ -309,7 +316,7 @@ run_single_tmle_analysis <- function(
       raw_final$mv0 <- NA
       raw_final$mvd <- NA
     }
-
+    
   } else if (tmle_variant == "cvq") {
     result <- cvq_tmle(
       Y = Y,
@@ -322,7 +329,7 @@ run_single_tmle_analysis <- function(
       family = family,
       ...
     )
-
+    
     if (!is.null(result)) {
       raw_final <- result$results
       raw_final$method <- "cvq"
@@ -331,7 +338,7 @@ run_single_tmle_analysis <- function(
       raw_final$mv0 <- NA
       raw_final$mvd <- NA
     }
-
+    
   } else if (tmle_variant == "cvq_multiple") {
     result <- cvq_tmle_multiple(
       Y = Y,
@@ -345,12 +352,12 @@ run_single_tmle_analysis <- function(
       num_repetitions = num_repetitions,
       ...
     )
-
+    
     if (!is.null(result)) {
       # Final results
       raw_final <- dplyr::as_tibble(t(result$aggregated_results)) %>%
         dplyr::mutate(method = "cvq_multiple")
-
+      
       # Intermediate results (repetitions)
       raw_intermediate <- result$repetitions %>%
         dplyr::mutate(
@@ -358,7 +365,7 @@ run_single_tmle_analysis <- function(
           method = "cvq_multiple"
         )
     }
-
+    
   } else if (tmle_variant == "fullcv") {
     result <- fullcv_tmle(
       Y = Y,
@@ -370,7 +377,7 @@ run_single_tmle_analysis <- function(
       family = family,
       ...
     )
-
+    
     if (!is.null(result)) {
       raw_final <- result$results
       raw_final$method <- "fullcv"
@@ -379,7 +386,7 @@ run_single_tmle_analysis <- function(
       raw_final$mv0 <- NA
       raw_final$mvd <- NA
     }
-
+    
   } else if (tmle_variant == "fullcv_multiple") {
     result <- fullcv_tmle_multiple(
       Y = Y,
@@ -392,12 +399,12 @@ run_single_tmle_analysis <- function(
       num_repetitions = num_repetitions,
       ...
     )
-
+    
     if (!is.null(result)) {
       # Final results
       raw_final <- dplyr::as_tibble(t(result$aggregated_results)) %>%
         dplyr::mutate(method = "fullcv_multiple")
-
+      
       # Intermediate results (repetitions)
       raw_intermediate <- result$repetitions %>%
         dplyr::mutate(
@@ -405,7 +412,7 @@ run_single_tmle_analysis <- function(
           method = "fullcv_multiple"
         )
     }
-
+    
   } else if (tmle_variant == "singlecrossfit") {
     result <- singlecrossfit_tmle(
       Y = Y,
@@ -417,12 +424,12 @@ run_single_tmle_analysis <- function(
       num_repetitions = num_repetitions,
       ...
     )
-
+    
     if (!is.null(result)) {
       # Final results
       raw_final <- dplyr::as_tibble(t(result$aggregated_results)) %>%
         dplyr::mutate(method = "singlecrossfit")
-
+      
       # Intermediate results (repetitions)
       raw_intermediate <- result$repetitions %>%
         dplyr::mutate(
@@ -430,7 +437,7 @@ run_single_tmle_analysis <- function(
           method = "singlecrossfit"
         )
     }
-
+    
   } else if (tmle_variant == "doublecrossfit") {
     result <- doublecrossfit_tmle(
       Y = Y,
@@ -442,12 +449,12 @@ run_single_tmle_analysis <- function(
       num_repetitions = num_repetitions,
       ...
     )
-
+    
     if (!is.null(result)) {
       # Final results
       raw_final <- dplyr::as_tibble(t(result$aggregated_results)) %>%
         dplyr::mutate(method = "doublecrossfit")
-
+      
       # Intermediate results (repetitions)
       raw_intermediate <- result$repetitions %>%
         dplyr::mutate(
@@ -456,7 +463,7 @@ run_single_tmle_analysis <- function(
         )
     }
   }
-
+  
   # Return results
   return(list(
     raw_final = raw_final,
@@ -518,21 +525,21 @@ run_multiple_tmle_variants <- function(
   valid_variants <- c("vanilla", "cvq", "cvq_multiple", "fullcv",
                       "fullcv_multiple", "singlecrossfit", "doublecrossfit")
   invalid_variants <- setdiff(tmle_variants, valid_variants)
-
+  
   if (length(invalid_variants) > 0) {
     stop(paste("Invalid TMLE variants:", paste(invalid_variants, collapse = ", "),
                ". Valid options are:", paste(valid_variants, collapse = ", ")))
   }
-
+  
   # Initialize result containers
   all_results <- list()
   all_raw_final <- NULL
   all_raw_intermediate <- NULL
-
+  
   # Run each TMLE variant
   for (variant in tmle_variants) {
     message(paste("Running TMLE variant:", variant))
-
+    
     result <- run_tmle_analysis(
       data = data,
       outcome_var = outcome_var,
@@ -554,28 +561,28 @@ run_multiple_tmle_variants <- function(
       save_results = FALSE,  # We'll save the combined results later
       ...
     )
-
+    
     all_results[[variant]] <- result
     all_raw_final <- dplyr::bind_rows(all_raw_final, result$raw_final)
-
+    
     if (!is.null(result$raw_intermediate)) {
       all_raw_intermediate <- dplyr::bind_rows(all_raw_intermediate, result$raw_intermediate)
     }
   }
-
+  
   # Create combined interpreted results
   combined_interpreted <- format_results(list(results = all_raw_final), confint = TRUE)
-
+  
   # Save combined results if requested
   if (save_results) {
     # Create results directory if it doesn't exist
     if (!dir.exists(results_dir)) {
       dir.create(results_dir, recursive = TRUE)
     }
-
+    
     timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
     variant_suffix <- paste(tmle_variants, collapse = "_")
-
+    
     # Save raw final results
     if (!is.null(all_raw_final)) {
       raw_final_file <- file.path(results_dir,
@@ -583,7 +590,7 @@ run_multiple_tmle_variants <- function(
       utils::write.csv(all_raw_final, raw_final_file, row.names = FALSE)
       message(paste("Combined raw final results saved to:", raw_final_file))
     }
-
+    
     # Save raw intermediate results if they exist
     if (!is.null(all_raw_intermediate)) {
       raw_intermediate_file <- file.path(results_dir,
@@ -591,7 +598,7 @@ run_multiple_tmle_variants <- function(
       utils::write.csv(all_raw_intermediate, raw_intermediate_file, row.names = FALSE)
       message(paste("Combined raw intermediate results saved to:", raw_intermediate_file))
     }
-
+    
     # Save interpreted results
     if (!is.null(combined_interpreted)) {
       interpreted_file <- file.path(results_dir,
@@ -600,7 +607,7 @@ run_multiple_tmle_variants <- function(
       message(paste("Combined interpreted results saved to:", interpreted_file))
     }
   }
-
+  
   # Return combined results
   return(list(
     raw_final = all_raw_final,

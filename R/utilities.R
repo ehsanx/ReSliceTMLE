@@ -1,3 +1,28 @@
+#' @importFrom dplyr tibble bind_rows left_join as_tibble
+#' @importFrom tidyr nest
+#' @importFrom purrr map
+#' @importFrom stats var median qnorm pnorm complete.cases model.matrix sd binomial gaussian coef glm
+#' @importFrom utils write.csv
+#' @importFrom rlang .data
+NULL
+
+#' Load all required packages for ReSliceTMLE
+#'
+#' @export
+load_dependencies <- function() {
+  # Core packages
+  suppressPackageStartupMessages(require(dplyr))
+  suppressPackageStartupMessages(require(tidyr))
+  suppressPackageStartupMessages(require(purrr))
+  suppressPackageStartupMessages(require(tmle))
+  suppressPackageStartupMessages(require(SuperLearner))
+  suppressPackageStartupMessages(require(glmnet))
+  suppressPackageStartupMessages(require(gam))
+  suppressPackageStartupMessages(require(nnls))
+  
+  message("All required packages loaded successfully")
+}
+
 #' Prepare data for TMLE analysis
 #'
 #' This function prepares a dataset for TMLE analysis by handling missing values,
