@@ -48,6 +48,7 @@ devtools::install_github("ehsanx/ReSliceTMLE")
 
 ```r
 library(ReSliceTMLE)
+ReSliceTMLE::load_dependencies()
 
 # Load example data
 data("tmle_example_data")
