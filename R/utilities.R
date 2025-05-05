@@ -10,18 +10,22 @@ NULL
 #'
 #' @export
 load_dependencies <- function() {
-  # Core packages
-  suppressPackageStartupMessages(require(dplyr))
-  suppressPackageStartupMessages(require(tidyr))
-  suppressPackageStartupMessages(require(purrr))
-  suppressPackageStartupMessages(require(tmle))
-  suppressPackageStartupMessages(require(SuperLearner))
-  suppressPackageStartupMessages(require(glmnet))
-  suppressPackageStartupMessages(require(gam))
-  suppressPackageStartupMessages(require(nnls))
+  required_pkgs <- c(
+    "dplyr", "tidyr", "purrr", "rlang", "magrittr", "stringr", "readr", 
+    "lubridate", "forcats", "tibble", "dbarts",
+    "tmle", "SuperLearner", "glmnet", "gam", "nnls", "tidyverse"
+  )
   
-  message("All required packages loaded successfully")
+  for (pkg in required_pkgs) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      stop(sprintf("Package '%s' is not installed. Please install it first.", pkg), call. = FALSE)
+    }
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+  }
+  
+  message("All required packages loaded successfully.")
 }
+
 
 #' Prepare data for TMLE analysis
 #'
