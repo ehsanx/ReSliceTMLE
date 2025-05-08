@@ -608,11 +608,43 @@ run_multiple_tmle_variants <- function(
     }
   }
   
+  # Create combined summary if true values were provided
+  combined_summary <- NULL
+  if (!is.null(true_value)) {
+    # Extract summaries from each variant's results
+    variant_summaries <- lapply(all_results, function(result) {
+      if (!is.null(result$summary)) {
+        # Add method column if not present
+        if (!"method" %in% names(result$summary)) {
+          result$summary$method <- result$raw_final$method[1]
+        }
+        return(result$summary)
+      } else {
+        return(NULL)
+      }
+    })
+    
+    # Remove NULL entries and bind rows
+    variant_summaries <- variant_summaries[!sapply(variant_summaries, is.null)]
+    if (length(variant_summaries) > 0) {
+      combined_summary <- dplyr::bind_rows(variant_summaries)
+    }
+    
+    # Save combined summary if requested
+    if (save_results && !is.null(combined_summary)) {
+      summary_file <- file.path(results_dir,
+                                paste0("tmle_combined_summary_", variant_suffix, "_", timestamp, ".csv"))
+      utils::write.csv(combined_summary, summary_file, row.names = FALSE)
+      message(paste("Combined summary results saved to:", summary_file))
+    }
+  }
+  
   # Return combined results
   return(list(
     raw_final = all_raw_final,
     raw_intermediate = all_raw_intermediate,
     interpreted_results = combined_interpreted,
-    individual_results = all_results
+    individual_results = all_results,
+    summary = combined_summary
   ))
 }
