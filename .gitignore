@@ -1,2 +1,11 @@
-inst/doc
-.Rproj.user
+# R project files
+.Rproj.user/
+.Rproj.user/06B9A4DF/sources/
+
+# Results directory
+results/
+
+# Common R files to ignore
+.Rhistory
+.RData
+.Ruserdata
