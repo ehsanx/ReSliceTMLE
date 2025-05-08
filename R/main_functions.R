@@ -536,6 +536,23 @@ run_multiple_tmle_variants <- function(
   all_raw_final <- NULL
   all_raw_intermediate <- NULL
   
+  # Process true_value
+  true_values_list <- NULL
+  if (!is.null(true_value)) {
+    if (length(true_value) == 1) {
+      # Single ATE value provided
+      true_values_list <- list(r1 = NA, r0 = NA, rd = true_value)
+    } else if (length(true_value) == 3) {
+      # Full r1, r0, rd values provided
+      true_values_list <- list(r1 = true_value[1], r0 = true_value[2], rd = true_value[3])
+    } else {
+      warning("Invalid true_value format. Expected either a single ATE value or a vector of 3 values (r1, r0, rd).")
+    }
+  }
+  
+  # Check if we're dealing with simulation data
+  is_simulation <- !is.null(sim_id_col) && sim_id_col %in% names(data)
+  
   # Run each TMLE variant
   for (variant in tmle_variants) {
     message(paste("Running TMLE variant:", variant))
@@ -563,15 +580,37 @@ run_multiple_tmle_variants <- function(
     )
     
     all_results[[variant]] <- result
-    all_raw_final <- dplyr::bind_rows(all_raw_final, result$raw_final)
+    
+    # Add the specific variant as a column to the raw_final results
+    if (!is.null(result$raw_final)) {
+      # Make sure the method column correctly reflects the variant name
+      result$raw_final$method <- variant
+      all_raw_final <- dplyr::bind_rows(all_raw_final, result$raw_final)
+    }
     
     if (!is.null(result$raw_intermediate)) {
+      # Make sure the method column correctly reflects the variant name
+      result$raw_intermediate$method <- variant
       all_raw_intermediate <- dplyr::bind_rows(all_raw_intermediate, result$raw_intermediate)
     }
   }
   
   # Create combined interpreted results
   combined_interpreted <- format_results(list(results = all_raw_final), confint = TRUE)
+  
+  # Use the combine_simulation_results function to generate a summary if we're dealing with 
+  # simulation data and have true values
+  all_summary <- NULL
+  if (is_simulation) {
+    combined_results <- combine_simulation_results(
+      list(results = all_raw_final),
+      true_values = true_values_list
+    )
+    
+    if (!is.null(combined_results)) {
+      all_summary <- combined_results$summary
+    }
+  }
   
   # Save combined results if requested
   if (save_results) {
@@ -606,35 +645,12 @@ run_multiple_tmle_variants <- function(
       utils::write.csv(combined_interpreted, interpreted_file, row.names = FALSE)
       message(paste("Combined interpreted results saved to:", interpreted_file))
     }
-  }
-  
-  # Create combined summary if true values were provided
-  combined_summary <- NULL
-  if (!is.null(true_value)) {
-    # Extract summaries from each variant's results
-    variant_summaries <- lapply(all_results, function(result) {
-      if (!is.null(result$summary)) {
-        # Add method column if not present
-        if (!"method" %in% names(result$summary)) {
-          result$summary$method <- result$raw_final$method[1]
-        }
-        return(result$summary)
-      } else {
-        return(NULL)
-      }
-    })
     
-    # Remove NULL entries and bind rows
-    variant_summaries <- variant_summaries[!sapply(variant_summaries, is.null)]
-    if (length(variant_summaries) > 0) {
-      combined_summary <- dplyr::bind_rows(variant_summaries)
-    }
-    
-    # Save combined summary if requested
-    if (save_results && !is.null(combined_summary)) {
+    # Save summary results
+    if (!is.null(all_summary)) {
       summary_file <- file.path(results_dir,
                                 paste0("tmle_combined_summary_", variant_suffix, "_", timestamp, ".csv"))
-      utils::write.csv(combined_summary, summary_file, row.names = FALSE)
+      utils::write.csv(all_summary, summary_file, row.names = FALSE)
       message(paste("Combined summary results saved to:", summary_file))
     }
   }
@@ -645,6 +661,6 @@ run_multiple_tmle_variants <- function(
     raw_intermediate = all_raw_intermediate,
     interpreted_results = combined_interpreted,
     individual_results = all_results,
-    summary = combined_summary
+    summary = all_summary
   ))
 }
