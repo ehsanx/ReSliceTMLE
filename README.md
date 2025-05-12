@@ -158,17 +158,7 @@ result <- run_tmle_analysis(
 )
 ```
 
----
 
-## 📄 License
-
-TBD
-
----
-
-## 📚 Citation
-
-TBD
 
 ```
 [Citation information placeholder]
