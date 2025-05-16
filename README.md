@@ -160,6 +160,3 @@ result <- run_tmle_analysis(
 
 
 
-```
-[Citation information placeholder]
-```
